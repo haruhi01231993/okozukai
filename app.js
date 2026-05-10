@@ -723,7 +723,7 @@ function openAddModal() {
   $("edit-save").textContent = "保存";
   updateEditPreview();
   showModal("modal-edit");
-  setTimeout(() => $("edit-name").focus(), 50);
+  setTimeout(() => $("edit-amount").focus(), 50);
 }
 
 function openEditModal(e) {
