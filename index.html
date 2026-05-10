@@ -83,7 +83,7 @@
       <div class="modal-header">
         <button class="text-btn" id="edit-cancel">キャンセル</button>
         <h2 class="modal-title" id="edit-title">支出を追加</h2>
-        <button class="text-btn primary" id="edit-save" disabled>保存</button>
+        <span class="text-btn" style="visibility:hidden;">保存</span>
       </div>
       <div class="modal-body">
         <div class="form-section">
@@ -112,6 +112,7 @@
             <span id="edit-preview" class="mono"></span>
           </div>
         </div>
+        <button class="btn-primary" id="edit-save" disabled>保存</button>
         <div id="edit-delete-section" class="hidden">
           <button class="btn-danger" id="edit-delete">この記録を削除</button>
         </div>

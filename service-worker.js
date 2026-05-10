@@ -1,5 +1,5 @@
 // シンプルなオフラインキャッシュ
-const CACHE_NAME = "okozukai-v1";
+const CACHE_NAME = "okozukai-v2";
 const ASSETS = [
   "./",
   "./index.html",
