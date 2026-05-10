@@ -20,6 +20,7 @@ const defaultState = {
   sheetName: "",
   rolloverEnabled: true,
   lastSeenMonth: "",
+  messageSeed: 0,          // モチベメッセージのローテーション用
 };
 
 let state = loadState();
@@ -199,6 +200,63 @@ function computeRating(spent, budget) {
   if (r < 0.9) return "good";
   if (r <= 1.0) return "warning";
   return "over";
+}
+
+// =====================================================
+// モチベーションメッセージ
+// =====================================================
+function savingsHint(saved) {
+  if (saved >= 30000) return "ちょっとした旅行";
+  if (saved >= 15000) return "ちょっと贅沢な食事";
+  if (saved >= 8000) return "美味しいランチ複数回分";
+  if (saved >= 4000) return "映画1回と軽食";
+  if (saved >= 2000) return "コーヒー数杯〜ランチ1回";
+  if (saved >= 1000) return "コンビニデザート3個";
+  if (saved >= 500) return "コーヒー1杯";
+  return "もう一息！";
+}
+
+const MESSAGES = {
+  savings: [
+    (sav) => `🌱 良いペース！この調子で続けよう`,
+    (sav) => `✨ ${formatYen(sav)}の節約で${savingsHint(sav)}が買えるかも`,
+    (sav) => `🎉 このペースなら年間 ${formatYen(sav * 12)} 貯まる計算！`,
+    (sav) => `💪 順調にキープ中。素晴らしい！`,
+    (sav) => `🌸 計画的でえらい！その調子`,
+    (sav) => `☕️ 浮いた分でちょっとご褒美？`,
+    (sav) => `🍀 今月の節約が来月の余裕に`,
+  ],
+  over: [
+    (over) => `💡 残りの週で少し抑えれば取り戻せる`,
+    (over) => `🍵 来週はスローダウンしてみよう`,
+    (over) => `📊 後半戦、ここから挽回！`,
+    (over) => `🌷 オーバーした分は次の節約で取り返せる`,
+    (over) => `🎯 ${formatYen(Math.abs(over))}多め。残り週で工夫してみよう`,
+    (over) => `🔄 ペース調整中。気にせず続けよう`,
+  ],
+  ontrack: [
+    `📈 計画通りのペース`,
+    `👌 ちょうどいいバランス`,
+    `🌼 マイペースに進んでます`,
+    `⚖️ ぴったり予算内`,
+  ],
+};
+
+function pickMessage() {
+  const sav = monthSavings();
+  const seed = state.messageSeed || 0;
+  let pool;
+  if (sav > 200) pool = MESSAGES.savings;
+  else if (sav < -200) pool = MESSAGES.over;
+  else pool = MESSAGES.ontrack;
+  const item = pool[seed % pool.length];
+  if (typeof item === "function") return item(sav);
+  return item;
+}
+
+function rotateMessage() {
+  state.messageSeed = (state.messageSeed || 0) + 1;
+  saveState();
 }
 
 function ratingLabel(r) {
@@ -537,6 +595,13 @@ function renderBalance() {
   } else {
     badge.classList.add("hidden");
   }
+
+  // モチベーションメッセージ
+  const msg = $("motivation-message");
+  if (msg && isConfigured()) {
+    msg.textContent = pickMessage();
+    msg.classList.remove("hidden");
+  }
 }
 
 function renderWeekly() {
@@ -581,7 +646,9 @@ function renderExpenseList() {
     empty.classList.remove("hidden");
   } else {
     empty.classList.add("hidden");
-    list.innerHTML = state.expenses.map(e => `
+    // 日付の新しい順にソート（同じ日は元の順）
+    const sorted = [...state.expenses].sort((a, b) => b.date.localeCompare(a.date));
+    list.innerHTML = sorted.map(e => `
       <div class="expense-row" data-id="${e.id}">
         <div class="expense-info">
           <div class="expense-name">${escapeHtml(e.name)}</div>
@@ -859,6 +926,9 @@ async function syncAction() {
     }
     await writeValuesWithNotes(state.spreadsheetId, sheetId, updates);
     showToast(`${updates.length}件のカテゴリを${header}列に書き込みました`);
+    // 同期したらメッセージを更新
+    rotateMessage();
+    renderBalance();
   } catch (e) {
     showToast(e.message);
   } finally {
