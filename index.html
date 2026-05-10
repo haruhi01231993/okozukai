@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="おこづかい">
+  <meta name="theme-color" content="#0a84ff">
+  <title>おこづかい</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <!-- 初回設定画面 -->
+  <div id="screen-onboarding" class="screen hidden">
+    <div class="onboarding-content">
+      <div class="onboarding-emoji">🪙</div>
+      <h1>ようこそ</h1>
+      <p class="muted">1ヶ月のおこづかい目標金額を入力してください</p>
+      <div class="amount-input-large">
+        <span class="yen">¥</span>
+        <input id="onboarding-amount" type="number" inputmode="numeric" placeholder="30000">
+      </div>
+      <button id="onboarding-start" class="btn-primary" disabled>はじめる</button>
+    </div>
+  </div>
+
+  <!-- メイン画面 -->
+  <div id="screen-main" class="screen hidden">
+    <header class="app-header">
+      <button class="header-btn" id="btn-settings" aria-label="設定">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm7.4-2.5l1.97 1.54a.5.5 0 0 1 .12.65l-1.86 3.22a.5.5 0 0 1-.6.22l-2.32-.94c-.49.37-1.02.69-1.6.92l-.35 2.46a.5.5 0 0 1-.5.43h-3.72a.5.5 0 0 1-.5-.43l-.35-2.46c-.58-.23-1.11-.55-1.6-.92l-2.32.94a.5.5 0 0 1-.6-.22L3.31 15.19a.5.5 0 0 1 .12-.65L5.4 13a7.6 7.6 0 0 1 0-2L3.43 9.46a.5.5 0 0 1-.12-.65l1.86-3.22a.5.5 0 0 1 .6-.22l2.32.94c.49-.37 1.02-.69 1.6-.92l.35-2.46a.5.5 0 0 1 .5-.43h3.72c.25 0 .46.18.5.43l.35 2.46c.58.23 1.11.55 1.6.92l2.32-.94a.5.5 0 0 1 .6.22l1.86 3.22a.5.5 0 0 1-.12.65L18.6 11a7.6 7.6 0 0 1 0 2z"/></svg>
+      </button>
+      <h1 class="app-title">おこづかい</h1>
+      <button class="header-btn" id="btn-sync" aria-label="同期">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+      </button>
+    </header>
+
+    <div class="content-scroll">
+      <!-- 残高カード -->
+      <div class="card balance-card" id="balance-card">
+        <div class="muted small">今月の残り</div>
+        <div class="balance-amount" id="balance-amount">¥0</div>
+        <div id="savings-badge" class="hidden"></div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="balance-meta">
+          <span id="balance-spent">使った: ¥0</span>
+          <span id="balance-budget">目標: ¥0</span>
+        </div>
+      </div>
+
+      <!-- 週ごとカード -->
+      <div class="card weekly-card hidden" id="weekly-card">
+        <div class="muted small">週ごとのおこづかい</div>
+        <div id="weekly-rows"></div>
+      </div>
+
+      <!-- 支出リスト -->
+      <div class="card expense-list-card" id="expense-list-card">
+        <div class="muted small">今月の記録</div>
+        <div id="expense-list"></div>
+        <div id="expense-empty" class="empty-state hidden">
+          <p>まだ記録がありません</p>
+          <p class="small muted">右下の「+」から追加できます</p>
+        </div>
+      </div>
+    </div>
+
+    <button class="fab" id="btn-add" aria-label="追加">
+      <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+    </button>
+  </div>
+
+  <!-- 追加・編集モーダル -->
+  <div id="modal-edit" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <button class="text-btn" id="edit-cancel">キャンセル</button>
+        <h2 class="modal-title" id="edit-title">支出を追加</h2>
+        <button class="text-btn primary" id="edit-save" disabled>保存</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-section">
+          <label class="form-label">品目</label>
+          <input id="edit-name" type="text" placeholder="例: ネイル代" class="form-input">
+        </div>
+        <div class="form-section">
+          <label class="form-label">金額</label>
+          <div class="amount-input">
+            <span class="yen">¥</span>
+            <input id="edit-amount" type="number" inputmode="numeric" placeholder="0" class="form-input">
+          </div>
+        </div>
+        <div class="form-section">
+          <label class="form-label">カテゴリ</label>
+          <select id="edit-category" class="form-select"></select>
+          <p class="form-help">品目から自動推定。違うときだけ変更してください。</p>
+        </div>
+        <div class="form-section">
+          <label class="form-label">購入日</label>
+          <input id="edit-date" type="date" class="form-input">
+        </div>
+        <div class="form-section">
+          <div class="preview-row">
+            <span class="muted">追加後の残高</span>
+            <span id="edit-preview" class="mono"></span>
+          </div>
+        </div>
+        <div id="edit-delete-section" class="hidden">
+          <button class="btn-danger" id="edit-delete">この記録を削除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 設定モーダル -->
+  <div id="modal-settings" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">設定</h2>
+        <button class="text-btn primary" id="settings-close">閉じる</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-section">
+          <label class="form-label">月のおこづかい目標</label>
+          <div class="amount-input">
+            <span class="yen">¥</span>
+            <input id="settings-budget" type="number" inputmode="numeric" class="form-input">
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="toggle-row">
+            <div>
+              <div>節約分を翌週以降に分配</div>
+              <div class="form-help">オン: 完了週の余りを残り週で均等分配 / オフ: 各週独立</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="settings-rollover">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="section-header">Google アカウント</div>
+        <div class="form-section">
+          <div id="auth-status" class="auth-status">
+            <span id="auth-text" class="muted">未接続</span>
+            <button id="btn-signin" class="btn-secondary">Googleでサインイン</button>
+            <button id="btn-signout" class="btn-secondary hidden">サインアウト</button>
+          </div>
+        </div>
+
+        <div class="section-header">スプレッドシート</div>
+        <div class="form-section">
+          <label class="form-label">スプレッドシートID</label>
+          <input id="settings-ss-id" type="text" class="form-input" autocapitalize="off" autocorrect="off">
+          <p class="form-help">URLの /d/ と /edit の間の文字列</p>
+        </div>
+        <div class="form-section">
+          <label class="form-label">シート名（タブ名）</label>
+          <input id="settings-sheet-name" type="text" class="form-input" autocapitalize="off">
+        </div>
+        <div class="form-section">
+          <button id="btn-fetch-categories" class="btn-secondary">シートからカテゴリを取り込む</button>
+        </div>
+        <div id="categories-list-section" class="form-section hidden">
+          <label class="form-label">カテゴリ（スワイプ／✕で削除）</label>
+          <div id="categories-list" class="categories-list"></div>
+        </div>
+
+        <div id="history-section" class="form-section hidden">
+          <div class="section-header">過去の月</div>
+          <div id="history-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 月末サマリー -->
+  <div id="modal-summary" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">月末サマリー</h2>
+        <button class="text-btn primary" id="summary-close">閉じる</button>
+      </div>
+      <div class="modal-body" id="summary-body"></div>
+    </div>
+  </div>
+
+  <!-- トースト/アラート -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
