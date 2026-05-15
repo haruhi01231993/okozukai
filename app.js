@@ -1052,6 +1052,48 @@ function bindEvents() {
 
   // Summary modal
   $("summary-close").addEventListener("click", () => hideModal("modal-summary"));
+
+  // Backup
+  $("btn-export").addEventListener("click", exportData);
+  $("import-file").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) importData(file);
+    e.target.value = "";
+  });
+}
+
+// =====================================================
+// バックアップ / 復元
+// =====================================================
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const date = todayISO();
+  a.href = url;
+  a.download = `okozukai-backup-${date}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("バックアップを保存しました");
+}
+
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!confirm("現在のデータを上書きします。よろしいですか？")) return;
+      state = { ...defaultState, ...imported };
+      saveState();
+      renderAll();
+      showToast("データを復元しました");
+    } catch (err) {
+      showToast("ファイル読み込み失敗: " + err.message);
+    }
+  };
+  reader.readAsText(file);
 }
 
 // =====================================================

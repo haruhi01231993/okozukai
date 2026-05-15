@@ -181,6 +181,18 @@
           <div class="section-header">過去の月</div>
           <div id="history-list"></div>
         </div>
+
+        <div class="section-header">バックアップ</div>
+        <div class="form-section">
+          <button id="btn-export" class="btn-secondary">📥 データを書き出す</button>
+        </div>
+        <div class="form-section">
+          <label class="btn-secondary" style="display:block;text-align:center;cursor:pointer;">
+            📤 バックアップから復元
+            <input type="file" id="import-file" accept=".json,application/json" style="display:none;">
+          </label>
+          <p class="form-help">JSONファイルから過去のデータを読み込みます。現在のデータは上書きされます。</p>
+        </div>
       </div>
     </div>
   </div>

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>おこづかい — データバックアップ</title>
+  <style>
+    :root {
+      --bg: #f2f2f7;
+      --card: #fff;
+      --text: #000;
+      --muted: #6e6e73;
+      --accent: #6dc4b4;
+      --separator: #e5e5ea;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #000;
+        --card: #1c1c1e;
+        --text: #fff;
+        --muted: #98989f;
+        --separator: #38383a;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, "Hiragino Sans", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: max(24px, env(safe-area-inset-top)) 16px 24px;
+      line-height: 1.5;
+    }
+    h1 {
+      font-size: 22px;
+      margin-bottom: 12px;
+    }
+    .lead {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 {
+      font-size: 17px;
+      margin-bottom: 8px;
+    }
+    .card p {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    button, label.btn {
+      display: block;
+      width: 100%;
+      background: var(--accent);
+      color: white;
+      border: 0;
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      font-family: inherit;
+    }
+    button.secondary, label.btn.secondary {
+      background: rgba(109, 196, 180, 0.15);
+      color: var(--accent);
+    }
+    .danger {
+      background: rgba(255, 59, 48, 0.15);
+      color: #ff3b30;
+    }
+    input[type="file"] { display: none; }
+    textarea {
+      width: 100%;
+      min-height: 200px;
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+      border: 1px solid var(--separator);
+      border-radius: 8px;
+      padding: 8px;
+      background: var(--bg);
+      color: var(--text);
+      margin-top: 8px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .stats div { padding: 4px 0; }
+    .stats .num { font-weight: 600; font-variant-numeric: tabular-nums; }
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.85);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: 14px;
+      max-width: 80%;
+      text-align: center;
+      display: none;
+    }
+    .back-link {
+      display: inline-block;
+      margin-top: 24px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>📦 データバックアップ</h1>
+  <p class="lead">おこづかいアプリのデータを書き出し／復元します。アプリ本体とは別ページなので、キャッシュ問題の影響を受けません。</p>
+
+  <div class="card">
+    <h2>現在のデータ</h2>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="card">
+    <h2>📥 バックアップ（書き出し）</h2>
+    <p>すべてのデータをJSONファイルとして保存します。メモアプリやメールに添付して保管してください。</p>
+    <button onclick="downloadBackup()">JSONファイルを保存</button>
+    <button class="secondary" onclick="copyToClipboard()" style="margin-top:8px;">テキストをコピー</button>
+    <details style="margin-top:12px;">
+      <summary style="cursor:pointer;font-size:13px;color:var(--muted);">テキストを直接見る</summary>
+      <textarea id="dataText" readonly></textarea>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>📤 復元（読み込み）</h2>
+    <p>バックアップしたJSONファイルから復元します。<strong>現在のデータは上書きされます</strong>のでご注意ください。</p>
+    <label class="btn">
+      JSONファイルを選択
+      <input type="file" accept=".json,application/json" id="fileInput">
+    </label>
+  </div>
+
+  <div class="card">
+    <h2 style="color:#ff3b30;">⚠ データを削除</h2>
+    <p>このサイトのすべてのデータをこのブラウザから削除します。バックアップ済みであることを確認してから実行してください。</p>
+    <button class="danger" onclick="clearAll()">すべて削除</button>
+  </div>
+
+  <a class="back-link" href="./index.html">← アプリに戻る</a>
+  <div id="toast"></div>
+
+  <script>
+    const STORAGE_KEY = "kakeibo.v1";
+
+    function getData() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      } catch { return {}; }
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.style.display = "block";
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => t.style.display = "none", 2500);
+    }
+
+    function formatYen(n) {
+      const s = n < 0 ? "-" : "";
+      return s + "¥" + Math.abs(n).toLocaleString("en-US");
+    }
+
+    function renderStats() {
+      const d = getData();
+      const exp = (d.expenses || []);
+      const total = exp.reduce((a, e) => a + (e.amount || 0), 0);
+      const histKeys = Object.keys(d.history || {});
+      const stats = document.getElementById("stats");
+      stats.innerHTML = `
+        <div>月の目標</div><div class="num">${formatYen(d.monthlyBudget || 0)}</div>
+        <div>当月の記録数</div><div class="num">${exp.length}件</div>
+        <div>当月の合計</div><div class="num">${formatYen(total)}</div>
+        <div>過去の月</div><div class="num">${histKeys.length}ヶ月</div>
+        <div>カテゴリ数</div><div class="num">${(d.categoryRows || []).length}</div>
+        <div>シート名</div><div>${d.sheetName || "—"}</div>
+      `;
+      document.getElementById("dataText").value = JSON.stringify(d, null, 2);
+    }
+
+    function downloadBackup() {
+      const d = getData();
+      if (!Object.keys(d).length) {
+        showToast("保存するデータがありません");
+        return;
+      }
+      const blob = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const date = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `okozukai-backup-${date}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("ダウンロードしました");
+    }
+
+    function copyToClipboard() {
+      const text = JSON.stringify(getData(), null, 2);
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(
+          () => showToast("コピーしました"),
+          () => fallbackCopy(text)
+        );
+      } else {
+        fallbackCopy(text);
+      }
+    }
+
+    function fallbackCopy(text) {
+      const ta = document.getElementById("dataText");
+      ta.style.display = "block";
+      ta.select();
+      try {
+        document.execCommand("copy");
+        showToast("コピーしました");
+      } catch (e) {
+        showToast("コピー失敗。手動でテキストを選択してください");
+      }
+    }
+
+    document.getElementById("fileInput").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (!confirm("現在のデータを上書きします。よろしいですか？")) return;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          renderStats();
+          showToast("復元しました");
+        } catch (err) {
+          showToast("ファイル読み込み失敗: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    function clearAll() {
+      if (!confirm("本当にすべてのデータを削除しますか？")) return;
+      if (!confirm("最終確認: 復元できなくなります。続けますか？")) return;
+      localStorage.removeItem(STORAGE_KEY);
+      renderStats();
+      showToast("削除しました");
+    }
+
+    renderStats();
+  </script>
+</body>
+</html>
