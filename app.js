@@ -12,7 +12,7 @@ const STORAGE_KEY = "kakeibo.v1";
 
 const defaultState = {
   expenses: [],            // [{id, name, amount, category, date(YYYY-MM-DD)}]
-  history: {},             // {"2026-04": [Expense, ...]}
+  history: {},             // {"2026-04": [Expense, ...]}（旧構造、マイグレーション用）
   monthSummaries: {},      // {"2026-04": MonthSummary}
   categoryRows: [],        // [{name, row}]
   monthlyBudget: 0,
@@ -21,6 +21,9 @@ const defaultState = {
   rolloverEnabled: true,
   lastSeenMonth: "",
   messageSeed: 0,          // モチベメッセージのローテーション用
+  piggyBank: 0,            // 貯金箱の残高（非表示）
+  depositedMonths: [],     // 既に貯金箱に積算済みの月キー
+  monthlyBoosts: {},       // {"2026-06": 25000} 貯金箱を解放してブーストした額
 };
 
 let state = loadState();
@@ -150,11 +153,16 @@ let pendingSummaryKey = null;
 // =====================================================
 // 計算: 今月の合計、残額、節約状況
 // =====================================================
+function effectiveBudget(forKey = null) {
+  const key = forKey || monthKey();
+  return state.monthlyBudget + (state.monthlyBoosts[key] || 0);
+}
+
 function totalSpent() {
   return currentMonthExpenses().reduce((a, e) => a + e.amount, 0);
 }
 function remaining() {
-  return state.monthlyBudget - totalSpent();
+  return effectiveBudget() - totalSpent();
 }
 function isConfigured() {
   return state.monthlyBudget > 0;
@@ -165,17 +173,19 @@ function canSync() {
 
 /// 「予定ペースよりいくら節約／オーバーか」 正なら節約中
 function monthSavings() {
-  if (state.monthlyBudget <= 0) return 0;
+  const bud = effectiveBudget();
+  if (bud <= 0) return 0;
   const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const today = now.getDate();
-  const expectedByToday = Math.floor(state.monthlyBudget * today / daysInMonth);
+  const expectedByToday = Math.floor(bud * today / daysInMonth);
   return expectedByToday - totalSpent();
 }
 
 /// 週ごとの内訳（1日〜7日が1週目、8〜14が2週目…）
 function weekBreakdowns() {
-  if (state.monthlyBudget <= 0) return [];
+  const bud = effectiveBudget();
+  if (bud <= 0) return [];
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth(); // 0-based
@@ -183,7 +193,7 @@ function weekBreakdowns() {
   const weekCount = Math.ceil(daysInMonth / 7);
   if (weekCount <= 0) return [];
 
-  const baseWeekBudget = Math.floor(state.monthlyBudget / weekCount);
+  const baseWeekBudget = Math.floor(bud / weekCount);
   const today = now.getDate();
   const result = [];
   let perWeekAdjustment = 0;
@@ -299,6 +309,53 @@ function pickMessage() {
 function rotateMessage() {
   state.messageSeed = (state.messageSeed || 0) + 1;
   saveState();
+}
+
+// =====================================================
+// 貯金箱システム
+// =====================================================
+/// 過去月で未積算のものを貯金箱へ自動入金。
+/// 既に depositedMonths にあるものはスキップ（=金額固定）。
+function depositPastSavings() {
+  const pastKeys = pastMonthsWithData();
+  let changed = false;
+  let depositedThisRun = 0;
+  for (const key of pastKeys) {
+    if (state.depositedMonths.includes(key)) continue;
+    const monthExp = expensesForMonth(key);
+    const spent = monthExp.reduce((a, e) => a + e.amount, 0);
+    // その月のブーストも考慮（過去月にもブースト適用していた場合）
+    const monthBud = state.monthlyBudget + (state.monthlyBoosts[key] || 0);
+    const saved = monthBud - spent;
+    if (saved > 0) {
+      state.piggyBank += saved;
+      depositedThisRun += saved;
+    }
+    state.depositedMonths.push(key);
+    changed = true;
+  }
+  if (changed) {
+    saveState();
+    if (depositedThisRun > 0) {
+      // 金額は明示しない
+      setTimeout(() => showToast("前月の節約が貯金箱に追加されました🐷"), 600);
+    }
+  }
+}
+
+/// 貯金箱を開けて当月の予算にブースト
+function releasePiggyBank() {
+  if (state.piggyBank <= 0) {
+    showToast("貯金箱はまだ空っぽです。節約して育てよう🌱");
+    return;
+  }
+  if (!confirm("貯金箱を開けますか？\n中身は明かしませんが、今月のおこづかいに上乗せされます。")) return;
+  const cur = monthKey();
+  state.monthlyBoosts[cur] = (state.monthlyBoosts[cur] || 0) + state.piggyBank;
+  state.piggyBank = 0;
+  saveState();
+  renderAll();
+  showToast("🎉 おこづかいがブーストされた！");
 }
 
 function ratingLabel(r) {
@@ -648,6 +705,16 @@ function renderBalance() {
   if (msg && isConfigured()) {
     msg.textContent = pickMessage();
     msg.classList.remove("hidden");
+  }
+
+  // 貯金箱ボタンの状態
+  const piggyBtn = $("btn-piggy");
+  if (piggyBtn) {
+    if (state.piggyBank > 0) {
+      piggyBtn.classList.add("has-money");
+    } else {
+      piggyBtn.classList.remove("has-money");
+    }
   }
 }
 
@@ -1151,6 +1218,7 @@ function bindEvents() {
   $("btn-settings").addEventListener("click", openSettings);
   $("btn-sync").addEventListener("click", syncAction);
   $("btn-add").addEventListener("click", openAddModal);
+  $("btn-piggy").addEventListener("click", releasePiggyBank);
 
   // Edit modal
   $("edit-cancel").addEventListener("click", () => hideModal("modal-edit"));
@@ -1234,6 +1302,7 @@ function importData(file) {
 function init() {
   bindEvents();
   checkMonthReset();
+  depositPastSavings();
   renderAll();
   if (pendingSummaryKey) {
     setTimeout(() => openSummary(pendingSummaryKey), 300);

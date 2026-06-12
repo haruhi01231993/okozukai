@@ -146,6 +146,7 @@ input, select { font-family: inherit; font-size: inherit; color: inherit; }
   box-shadow: var(--shadow);
 }
 
+.balance-card { position: relative; }
 .balance-card .balance-amount {
   font-size: 44px;
   font-weight: 700;
@@ -153,6 +154,38 @@ input, select { font-family: inherit; font-size: inherit; color: inherit; }
   margin: 4px 0 8px;
 }
 .balance-card .balance-amount.negative { color: var(--red); }
+
+.piggy-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 52px;
+  height: 52px;
+  border-radius: 26px;
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+}
+.piggy-btn:active { transform: scale(0.9); }
+.piggy-btn.has-money {
+  background: rgba(255, 200, 70, 0.18);
+  color: #f7a800;
+  box-shadow: 0 0 0 2px rgba(255, 200, 70, 0.25);
+  animation: piggyWiggle 3s ease-in-out infinite;
+}
+@keyframes piggyWiggle {
+  0%, 70%, 100% { transform: rotate(0deg); }
+  75% { transform: rotate(-6deg); }
+  80% { transform: rotate(6deg); }
+  85% { transform: rotate(-4deg); }
+  90% { transform: rotate(4deg); }
+  95% { transform: rotate(0deg); }
+}
 
 #savings-badge {
   display: inline-flex;
