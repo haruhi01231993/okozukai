@@ -315,7 +315,9 @@ function rotateMessage() {
 // 貯金箱システム
 // =====================================================
 /// 過去月で未積算のものを貯金箱へ自動入金。
-/// 既に depositedMonths にあるものはスキップ（=金額固定）。
+/// 既に depositedMonths にあるものはスキップ（=金額固定、二重入金防止）。
+/// 節約額は **ブースト込みの実効予算** で計算するので、
+/// 開放したブーストを使い切らなかった分も貯金箱へ戻る。
 function depositPastSavings() {
   const pastKeys = pastMonthsWithData();
   let changed = false;
@@ -324,7 +326,7 @@ function depositPastSavings() {
     if (state.depositedMonths.includes(key)) continue;
     const monthExp = expensesForMonth(key);
     const spent = monthExp.reduce((a, e) => a + e.amount, 0);
-    // その月のブーストも考慮（過去月にもブースト適用していた場合）
+    // 実効予算（基本 + ブースト）に対する節約分を積算
     const monthBud = state.monthlyBudget + (state.monthlyBoosts[key] || 0);
     const saved = monthBud - spent;
     if (saved > 0) {
