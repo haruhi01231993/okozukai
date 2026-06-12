@@ -30,10 +30,30 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...defaultState };
     const parsed = JSON.parse(raw);
-    return { ...defaultState, ...parsed };
+    return migrateState({ ...defaultState, ...parsed });
   } catch (e) {
     return { ...defaultState };
   }
+}
+
+// 旧データ構造（history に過去月の expenses を分けて保存）から
+// 新構造（全 expenses を1つの配列に）へマイグレーション。
+function migrateState(s) {
+  if (s.history && Object.keys(s.history).length > 0) {
+    const idSet = new Set((s.expenses || []).map(e => e.id));
+    const merged = [...(s.expenses || [])];
+    for (const [k, exps] of Object.entries(s.history)) {
+      if (!Array.isArray(exps)) continue;
+      for (const e of exps) {
+        if (e && e.id && !idSet.has(e.id)) {
+          idSet.add(e.id);
+          merged.push(e);
+        }
+      }
+    }
+    s.expenses = merged;
+  }
+  return s;
 }
 
 function saveState() {
@@ -84,18 +104,39 @@ function formatMonthLabel(key) {
 }
 
 // =====================================================
-// 月リセット
+// 月リセット & expenses フィルタヘルパー
 // =====================================================
+function monthKeyOf(expense) {
+  return (expense.date || "").slice(0, 7);
+}
+
+function expensesForMonth(key) {
+  return state.expenses.filter(e => monthKeyOf(e) === key);
+}
+
+function currentMonthExpenses() {
+  return expensesForMonth(monthKey());
+}
+
+function pastMonthsWithData() {
+  const cur = monthKey();
+  const keys = new Set();
+  state.expenses.forEach(e => {
+    const k = monthKeyOf(e);
+    if (k && k !== cur && k <= cur) keys.add(k);
+  });
+  return [...keys].sort().reverse();
+}
+
 function checkMonthReset() {
   const cur = monthKey();
   const last = state.lastSeenMonth || cur;
   if (last !== cur) {
-    if (state.expenses.length > 0) {
-      state.history[last] = state.expenses;
-      state.monthSummaries[last] = buildMonthSummary(last, state.expenses, state.monthlyBudget);
+    // 前月の記録があればサマリーを表示候補に
+    const pastExpenses = expensesForMonth(last);
+    if (pastExpenses.length > 0) {
       pendingSummaryKey = last;
     }
-    state.expenses = [];
     state.lastSeenMonth = cur;
     saveState();
   } else if (!state.lastSeenMonth) {
@@ -110,7 +151,7 @@ let pendingSummaryKey = null;
 // 計算: 今月の合計、残額、節約状況
 // =====================================================
 function totalSpent() {
-  return state.expenses.reduce((a, e) => a + e.amount, 0);
+  return currentMonthExpenses().reduce((a, e) => a + e.amount, 0);
 }
 function remaining() {
   return state.monthlyBudget - totalSpent();
@@ -146,16 +187,17 @@ function weekBreakdowns() {
   const today = now.getDate();
   const result = [];
   let perWeekAdjustment = 0;
+  const monthExpenses = currentMonthExpenses();
 
   for (let i = 0; i < weekCount; i++) {
     const startDay = i * 7 + 1;
     const endDay = Math.min((i + 1) * 7, daysInMonth);
 
     // この週の支出
-    const spent = state.expenses
+    const spent = monthExpenses
       .filter(e => {
-        const [ey, em, ed] = e.date.split("-").map(Number);
-        return ey === year && (em - 1) === month && ed >= startDay && ed <= endDay;
+        const ed = parseInt(e.date.split("-")[2], 10);
+        return ed >= startDay && ed <= endDay;
       })
       .reduce((a, e) => a + e.amount, 0);
 
@@ -348,10 +390,15 @@ function buildMonthSummary(key, expenses, budget) {
 }
 
 function getSummary(key) {
-  if (state.monthSummaries[key]) return state.monthSummaries[key];
-  const past = state.history[key];
-  if (!past) return null;
-  return buildMonthSummary(key, past, state.monthlyBudget);
+  // 常に最新の expenses から再計算（編集を反映するため）
+  const monthExpenses = expensesForMonth(key);
+  if (monthExpenses.length === 0) return null;
+  return buildMonthSummary(key, monthExpenses, state.monthlyBudget);
+}
+
+// その月の支出を日付の新しい順に
+function expensesForMonthSorted(key) {
+  return [...expensesForMonth(key)].sort((a, b) => b.date.localeCompare(a.date));
 }
 
 // =====================================================
@@ -641,13 +688,14 @@ function renderWeekly() {
 function renderExpenseList() {
   const list = $("expense-list");
   const empty = $("expense-empty");
-  if (state.expenses.length === 0) {
+  const current = currentMonthExpenses();
+  if (current.length === 0) {
     list.innerHTML = "";
     empty.classList.remove("hidden");
   } else {
     empty.classList.add("hidden");
-    // 日付の新しい順にソート（同じ日は元の順）
-    const sorted = [...state.expenses].sort((a, b) => b.date.localeCompare(a.date));
+    // 当月のみ＋日付の新しい順
+    const sorted = expensesForMonthSorted(monthKey());
     list.innerHTML = sorted.map(e => `
       <div class="expense-row" data-id="${e.id}">
         <div class="expense-info">
@@ -784,6 +832,10 @@ function saveEdit() {
   saveState();
   renderAll();
   hideModal("modal-edit");
+  // サマリーが開いていればリフレッシュ
+  if (currentSummaryKey && !$("modal-summary").classList.contains("hidden")) {
+    openSummary(currentSummaryKey);
+  }
 }
 
 function deleteEdit() {
@@ -793,6 +845,9 @@ function deleteEdit() {
   saveState();
   renderAll();
   hideModal("modal-edit");
+  if (currentSummaryKey && !$("modal-summary").classList.contains("hidden")) {
+    openSummary(currentSummaryKey);
+  }
 }
 
 // =====================================================
@@ -834,7 +889,7 @@ function renderCategoriesList() {
 }
 
 function renderHistoryList() {
-  const keys = Object.keys(state.history).sort().reverse();
+  const keys = pastMonthsWithData();
   const section = $("history-section");
   if (keys.length === 0) {
     section.classList.add("hidden");
@@ -842,7 +897,7 @@ function renderHistoryList() {
   }
   section.classList.remove("hidden");
   $("history-list").innerHTML = keys.map(k => {
-    const total = (state.history[k] || []).reduce((a, e) => a + e.amount, 0);
+    const total = expensesForMonth(k).reduce((a, e) => a + e.amount, 0);
     return `
       <div class="history-row" data-key="${k}">
         <span>${formatMonthLabel(k)}</span>
@@ -890,24 +945,30 @@ async function fetchCategoriesAction() {
 // =====================================================
 // 同期
 // =====================================================
-async function syncAction() {
+/// monthKey ("YYYY-MM") を指定するとその月をシートへ書き込む。
+/// 省略時は現在月。
+async function syncMonth(targetMonthKey = null) {
   if (!canSync()) {
     showToast("シート設定が不足しています");
     return;
   }
-  const btn = $("btn-sync");
-  btn.disabled = true;
+  const key = targetMonthKey || monthKey();
   try {
     await ensureSignedIn();
-    const header = sheetMonthHeader();
+
+    // 対象月の "yyyy/MM" ヘッダー
+    const [y, m] = key.split("-").map(Number);
+    const header = `${y}/${pad2(m)}`;
+
     const sheetId = await getSheetId(state.spreadsheetId, state.sheetName);
     const colIdx = await findMonthColumnIndex(state.spreadsheetId, state.sheetName, header);
     if (colIdx < 0) throw new Error(`シート上で「${header}」の列が見つかりませんでした`);
 
+    const monthExpenses = expensesForMonth(key);
     const updates = [];
     for (const cat of state.categoryRows) {
       if (cat.row === 31) continue;
-      const items = state.expenses
+      const items = monthExpenses
         .filter(e => e.category === cat.name)
         .sort((a, b) => b.date.localeCompare(a.date));
       if (!items.length) continue;
@@ -931,6 +992,14 @@ async function syncAction() {
     renderBalance();
   } catch (e) {
     showToast(e.message);
+  }
+}
+
+async function syncAction() {
+  const btn = $("btn-sync");
+  btn.disabled = true;
+  try {
+    await syncMonth();
   } finally {
     btn.disabled = false;
   }
@@ -939,9 +1008,12 @@ async function syncAction() {
 // =====================================================
 // 月末サマリー画面
 // =====================================================
+let currentSummaryKey = null;
+
 function openSummary(key) {
   const s = getSummary(key);
   if (!s) return;
+  currentSummaryKey = key;
   const saved = s.monthlyBudget - s.totalSpent;
   let savedClass = "";
   let savedText = "";
@@ -970,12 +1042,22 @@ function openSummary(key) {
     `;
   }).join("");
 
-  const catsHtml = s.categoryTotals.map(c => `
-    <div class="week-row">
-      <div>${escapeHtml(c.name)}</div>
-      <div class="muted mono">${formatYen(c.amount)}</div>
+  // 日付順の記録一覧（今月の記録のような表示）
+  const recordsSorted = expensesForMonthSorted(key);
+  const recordsHtml = recordsSorted.map(e => `
+    <div class="expense-row summary-record" data-id="${e.id}">
+      <div class="expense-info">
+        <div class="expense-name">${escapeHtml(e.name)}</div>
+        <div class="expense-meta">
+          <span class="expense-cat-chip">${escapeHtml(e.category)}</span>
+          <span>${formatDateForList(e.date)}</span>
+        </div>
+      </div>
+      <div class="expense-amount">${formatYen(e.amount)}</div>
     </div>
   `).join("");
+
+  const showSyncBtn = canSync();
 
   $("summary-body").innerHTML = `
     <div class="summary-hero">
@@ -992,10 +1074,59 @@ function openSummary(key) {
         <span class="mono ${savedClass}">${saved > 0 ? "+" : ""}${formatYen(saved)}</span>
       </div>
     </div>
+    ${showSyncBtn ? `<button class="btn-secondary" id="summary-sync-btn">📊 この月をシートに反映</button>` : ""}
     ${weeksHtml ? `<div class="form-section"><div class="muted small" style="margin-bottom:8px;">週ごとの結果</div>${weeksHtml}</div>` : ""}
-    ${catsHtml ? `<div class="form-section"><div class="muted small" style="margin-bottom:8px;">カテゴリ別（多い順）</div>${catsHtml}</div>` : ""}
+    ${recordsHtml ? `<div class="form-section"><div class="muted small" style="margin-bottom:8px;">記録（日付順）</div>${recordsHtml}</div>` : `<div class="form-section"><div class="muted small">記録がありません</div></div>`}
+    <button class="btn-secondary" id="summary-categories-btn">📂 カテゴリ別で確認</button>
   `;
+
+  // ボタンのバインド
+  const syncBtn = document.getElementById("summary-sync-btn");
+  if (syncBtn) {
+    syncBtn.addEventListener("click", async () => {
+      syncBtn.disabled = true;
+      try {
+        await syncMonth(key);
+      } finally {
+        syncBtn.disabled = false;
+      }
+    });
+  }
+  const catsBtn = document.getElementById("summary-categories-btn");
+  if (catsBtn) {
+    catsBtn.addEventListener("click", () => openCategoriesView(key));
+  }
+  // 記録行タップで編集
+  document.querySelectorAll(".summary-record").forEach(el => {
+    el.addEventListener("click", () => {
+      const id = el.dataset.id;
+      const expense = state.expenses.find(x => x.id === id);
+      if (expense) openEditModal(expense);
+    });
+  });
+
   showModal("modal-summary");
+}
+
+function openCategoriesView(key) {
+  const s = getSummary(key);
+  if (!s) return;
+  const catsHtml = s.categoryTotals.length === 0
+    ? `<div class="muted small">記録がありません</div>`
+    : s.categoryTotals.map(c => `
+        <div class="week-row">
+          <div>${escapeHtml(c.name)}</div>
+          <div class="muted mono">${formatYen(c.amount)}</div>
+        </div>
+      `).join("");
+  $("categories-body").innerHTML = `
+    <div class="summary-hero" style="padding:16px 0;">
+      <h3>${formatMonthLabel(key)} カテゴリ別</h3>
+      <div class="muted small">合計 ${formatYen(s.totalSpent)}</div>
+    </div>
+    <div class="form-section">${catsHtml}</div>
+  `;
+  showModal("modal-categories");
 }
 
 // =====================================================
@@ -1052,6 +1183,7 @@ function bindEvents() {
 
   // Summary modal
   $("summary-close").addEventListener("click", () => hideModal("modal-summary"));
+  $("categories-back").addEventListener("click", () => hideModal("modal-categories"));
 
   // Backup
   $("btn-export").addEventListener("click", exportData);
