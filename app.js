@@ -1074,7 +1074,7 @@ function openSummary(key) {
         <span class="mono ${savedClass}">${saved > 0 ? "+" : ""}${formatYen(saved)}</span>
       </div>
     </div>
-    ${showSyncBtn ? `<button class="btn-secondary" id="summary-sync-btn">📊 この月をシートに反映</button>` : ""}
+    ${showSyncBtn ? `<button class="btn-secondary" id="summary-sync-btn" style="margin-bottom:16px;">この月をシートに反映</button>` : ""}
     ${weeksHtml ? `<div class="form-section"><div class="muted small" style="margin-bottom:8px;">週ごとの結果</div>${weeksHtml}</div>` : ""}
     ${recordsHtml ? `<div class="form-section"><div class="muted small" style="margin-bottom:8px;">記録（日付順）</div>${recordsHtml}</div>` : `<div class="form-section"><div class="muted small">記録がありません</div></div>`}
     <button class="btn-secondary" id="summary-categories-btn">📂 カテゴリ別で確認</button>
