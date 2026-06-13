@@ -1,11 +1,13 @@
 // シンプルなオフラインキャッシュ
-const CACHE_NAME = "okozukai-v13";
+const CACHE_NAME = "okozukai-v14";
+// 貯金箱画像もキャッシュ対象に追加
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./manifest.json",
+  "./tyokinbako.png",
 ];
 
 self.addEventListener("install", (e) => {
