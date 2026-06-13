@@ -44,8 +44,24 @@
       <!-- 残高カード -->
       <div class="card balance-card" id="balance-card">
         <button class="piggy-btn" id="btn-piggy" aria-label="貯金箱">
-          <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-            <path d="M19.83 7.5l-2.27-2.27c.07-.42.18-.81.32-1.15.11-.3-.04-.62-.34-.74-.31-.11-.65.04-.77.35-.13.32-.23.69-.31 1.07-.91-.4-1.93-.66-3.04-.7L11 2v2.43c-1.74.31-3.24 1.21-4.27 2.52L4 6.7v3.6l1.36.45c-.2.59-.36 1.21-.36 1.86 0 .26.03.51.08.75H4v4h1.55c.39.86.94 1.6 1.45 2.21V23h4v-1.5h4V23h4v-3.05c1.21-1.07 2-2.62 2-4.45v-1H22V9h-2.17zM17 11h-1v-1h1v1zm-5-4h-4V6h4v1z"/>
+          <svg viewBox="0 0 100 88" width="32" height="28" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <!-- 体（楕円） -->
+            <ellipse cx="52" cy="46" rx="42" ry="28"/>
+            <!-- 耳（左の三角） -->
+            <path d="M 18 22 L 8 8 L 30 18 Z"/>
+            <!-- しっぽ（くるりん） -->
+            <path d="M 92 30 C 100 22, 100 12, 92 14 C 86 16, 88 24, 94 22" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+            <!-- 足（4本） -->
+            <rect x="18" y="70" width="9" height="14" rx="2"/>
+            <rect x="38" y="72" width="9" height="14" rx="2"/>
+            <rect x="58" y="72" width="9" height="14" rx="2"/>
+            <rect x="76" y="70" width="9" height="14" rx="2"/>
+            <!-- コインスロット（白抜き） -->
+            <rect x="44" y="22" width="22" height="5" rx="2.5" fill="white"/>
+            <!-- 目（白抜き） -->
+            <circle cx="28" cy="40" r="3" fill="white"/>
+            <!-- 笑顔（白いライン） -->
+            <path d="M 72 52 Q 82 60, 92 52" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"/>
           </svg>
         </button>
         <div class="muted small">今月の残り</div>
