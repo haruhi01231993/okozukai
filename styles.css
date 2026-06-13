@@ -177,16 +177,21 @@ input, select { font-family: inherit; font-size: inherit; color: inherit; }
   display: block;
   width: 32px;
   height: 28px;
-  background-color: currentColor;
-  -webkit-mask: url("tyokinbako.png") center / contain no-repeat;
-          mask: url("tyokinbako.png") center / contain no-repeat;
-  transition: background-color 0.25s ease;
+  object-fit: contain;
+  opacity: 0.45;
+  transition: opacity 0.25s ease, filter 0.25s ease;
+}
+/* ダークモードでは黒い豚が見えなくなるので白く反転 */
+@media (prefers-color-scheme: dark) {
+  .piggy-icon { filter: invert(1); }
 }
 .piggy-btn.has-money {
   background: rgba(255, 200, 70, 0.18);
-  color: #f7a800;
-  box-shadow: 0 0 0 2px rgba(255, 200, 70, 0.25);
+  box-shadow: 0 0 0 2px rgba(255, 200, 70, 0.3);
   animation: piggyWiggle 3s ease-in-out infinite;
+}
+.piggy-btn.has-money .piggy-icon {
+  opacity: 1;
 }
 @keyframes piggyWiggle {
   0%, 70%, 100% { transform: rotate(0deg); }
