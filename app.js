@@ -15,7 +15,8 @@ const defaultState = {
   history: {},             // {"2026-04": [Expense, ...]}（旧構造、マイグレーション用）
   monthSummaries: {},      // {"2026-04": MonthSummary}
   categoryRows: [],        // [{name, row}]
-  monthlyBudget: 0,
+  monthlyBudget: 0,        // 新規月のデフォルト値（設定変更で更新）
+  monthlyBudgets: {},      // {"2026-05": 108556, "2026-06": 120000} 月ごとの目標額
   spreadsheetId: "",
   sheetName: "",
   rolloverEnabled: true,
@@ -39,9 +40,11 @@ function loadState() {
   }
 }
 
-// 旧データ構造（history に過去月の expenses を分けて保存）から
-// 新構造（全 expenses を1つの配列に）へマイグレーション。
+// マイグレーション:
+//   (1) history → expenses への統合
+//   (2) monthlyBudget → monthlyBudgets への展開（過去月に現在の目標額を固定）
 function migrateState(s) {
+  // (1) history をマージ
   if (s.history && Object.keys(s.history).length > 0) {
     const idSet = new Set((s.expenses || []).map(e => e.id));
     const merged = [...(s.expenses || [])];
@@ -55,6 +58,21 @@ function migrateState(s) {
       }
     }
     s.expenses = merged;
+  }
+  // (2) monthlyBudgets が未設定なら、既存の全月と当月を現在の monthlyBudget で埋める
+  if (!s.monthlyBudgets) s.monthlyBudgets = {};
+  if (s.monthlyBudget > 0) {
+    const monthsWithData = new Set();
+    (s.expenses || []).forEach(e => {
+      const k = (e.date || "").slice(0, 7);
+      if (k) monthsWithData.add(k);
+    });
+    monthsWithData.add(monthKey());
+    for (const k of monthsWithData) {
+      if (!(k in s.monthlyBudgets)) {
+        s.monthlyBudgets[k] = s.monthlyBudget;
+      }
+    }
   }
   return s;
 }
@@ -153,9 +171,25 @@ let pendingSummaryKey = null;
 // =====================================================
 // 計算: 今月の合計、残額、節約状況
 // =====================================================
+/// 指定月の基本目標額（設定なしの場合は現在のデフォルトにフォールバック）
+function budgetForMonth(key) {
+  if (state.monthlyBudgets && state.monthlyBudgets[key] != null) {
+    return state.monthlyBudgets[key];
+  }
+  return state.monthlyBudget || 0;
+}
+
+/// 過去月にも目標額の記録がなければ、現在のデフォルトを固定しておく
+function ensureMonthBudget(key) {
+  if (!state.monthlyBudgets) state.monthlyBudgets = {};
+  if (!(key in state.monthlyBudgets) && state.monthlyBudget > 0) {
+    state.monthlyBudgets[key] = state.monthlyBudget;
+  }
+}
+
 function effectiveBudget(forKey = null) {
   const key = forKey || monthKey();
-  return state.monthlyBudget + (state.monthlyBoosts[key] || 0);
+  return budgetForMonth(key) + (state.monthlyBoosts[key] || 0);
 }
 
 function totalSpent() {
@@ -165,7 +199,7 @@ function remaining() {
   return effectiveBudget() - totalSpent();
 }
 function isConfigured() {
-  return state.monthlyBudget > 0;
+  return state.monthlyBudget > 0 || Object.keys(state.monthlyBudgets || {}).length > 0;
 }
 function canSync() {
   return state.spreadsheetId && state.sheetName && state.categoryRows.length > 0;
@@ -324,10 +358,11 @@ function depositPastSavings() {
   let depositedThisRun = 0;
   for (const key of pastKeys) {
     if (state.depositedMonths.includes(key)) continue;
+    ensureMonthBudget(key);
     const monthExp = expensesForMonth(key);
     const spent = monthExp.reduce((a, e) => a + e.amount, 0);
-    // 実効予算（基本 + ブースト）に対する節約分を積算
-    const monthBud = state.monthlyBudget + (state.monthlyBoosts[key] || 0);
+    // 実効予算（その月の目標額 + ブースト）に対する節約分を積算
+    const monthBud = budgetForMonth(key) + (state.monthlyBoosts[key] || 0);
     const saved = monthBud - spent;
     if (saved > 0) {
       state.piggyBank += saved;
@@ -351,13 +386,17 @@ function releasePiggyBank() {
     showToast("貯金箱はまだ空っぽです。節約して育てよう🌱");
     return;
   }
-  if (!confirm("貯金箱を開けますか？\n中身は明かしませんが、今月のおこづかいに上乗せされます。")) return;
+  if (!confirm("貯金箱を開けますか？\n今月のおこづかいに上乗せされます。")) return;
   const cur = monthKey();
-  state.monthlyBoosts[cur] = (state.monthlyBoosts[cur] || 0) + state.piggyBank;
+  const releasedAmount = state.piggyBank;
+  state.monthlyBoosts[cur] = (state.monthlyBoosts[cur] || 0) + releasedAmount;
   state.piggyBank = 0;
   saveState();
   renderAll();
-  showToast("🎉 おこづかいがブーストされた！");
+  // 解放時に「貯めていた金額」を明かす
+  setTimeout(() => {
+    alert(`🎉 貯金箱から ${formatYen(releasedAmount)} 解放！\n今月のおこづかいに追加されました。`);
+  }, 100);
 }
 
 function ratingLabel(r) {
@@ -450,9 +489,10 @@ function buildMonthSummary(key, expenses, budget) {
 
 function getSummary(key) {
   // 常に最新の expenses から再計算（編集を反映するため）
+  // 予算は「その月固有の目標額」を使用（設定変更で過去月が変わらないように）
   const monthExpenses = expensesForMonth(key);
   if (monthExpenses.length === 0) return null;
-  return buildMonthSummary(key, monthExpenses, state.monthlyBudget);
+  return buildMonthSummary(key, monthExpenses, budgetForMonth(key));
 }
 
 // その月の支出を日付の新しい順に
@@ -679,12 +719,13 @@ function showToast(msg, ms = 2500) {
 function renderBalance() {
   const r = remaining();
   const t = totalSpent();
+  const curBud = effectiveBudget();
   $("balance-amount").textContent = formatYen(r);
   $("balance-amount").classList.toggle("negative", r < 0);
   $("balance-spent").textContent = "使った: " + formatYen(t);
-  $("balance-budget").textContent = "目標: " + formatYen(state.monthlyBudget);
+  $("balance-budget").textContent = "目標: " + formatYen(curBud);
 
-  const pct = state.monthlyBudget > 0 ? Math.min(Math.max(t / state.monthlyBudget * 100, 0), 100) : 0;
+  const pct = curBud > 0 ? Math.min(Math.max(t / curBud * 100, 0), 100) : 0;
   $("progress-fill").style.width = pct + "%";
   $("progress-fill").classList.toggle("over", r < 0);
 
@@ -923,7 +964,9 @@ function deleteEdit() {
 // 設定モーダル
 // =====================================================
 function openSettings() {
-  $("settings-budget").value = state.monthlyBudget > 0 ? String(state.monthlyBudget) : "";
+  // 表示は「今月の目標額」（monthlyBudgets[今月] があればそれ、なければデフォルト）
+  const curBud = budgetForMonth(monthKey());
+  $("settings-budget").value = curBud > 0 ? String(curBud) : "";
   $("settings-rollover").checked = state.rolloverEnabled;
   $("settings-ss-id").value = state.spreadsheetId || "";
   $("settings-sheet-name").value = state.sheetName || "";
@@ -986,7 +1029,13 @@ function renderHistoryList() {
 
 function saveSettings() {
   const v = parseInt($("settings-budget").value, 10);
-  if (v > 0) state.monthlyBudget = v;
+  if (v > 0) {
+    // 目標額の変更は「今月のみ」に適用（過去月は影響を受けない）
+    if (!state.monthlyBudgets) state.monthlyBudgets = {};
+    state.monthlyBudgets[monthKey()] = v;
+    // 新規月のデフォルト値も更新（翌月以降がこの値を継承）
+    state.monthlyBudget = v;
+  }
   state.rolloverEnabled = $("settings-rollover").checked;
   state.spreadsheetId = $("settings-ss-id").value.trim();
   state.sheetName = $("settings-sheet-name").value.trim();
@@ -1211,6 +1260,8 @@ function bindEvents() {
     const v = parseInt($("onboarding-amount").value, 10) || 0;
     if (v > 0) {
       state.monthlyBudget = v;
+      if (!state.monthlyBudgets) state.monthlyBudgets = {};
+      state.monthlyBudgets[monthKey()] = v;
       saveState();
       renderAll();
     }
