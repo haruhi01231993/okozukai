@@ -1,5 +1,5 @@
 // シンプルなオフラインキャッシュ
-const CACHE_NAME = "okozukai-v18";
+const CACHE_NAME = "okozukai-v19";
 // 貯金箱画像もキャッシュ対象に追加
 const ASSETS = [
   "./",
