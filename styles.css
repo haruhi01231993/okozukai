@@ -161,22 +161,21 @@ input, select { font-family: inherit; font-size: inherit; color: inherit; }
   right: 14px;
   width: 52px;
   height: 52px;
-  border-radius: 26px;
-  background: var(--bg-tertiary);
+  background: transparent;
   color: var(--text-tertiary);
   display: flex;
   align-items: center;
   justify-content: center;
   border: 0;
   cursor: pointer;
-  transition: transform 0.15s ease, background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+  transition: transform 0.15s ease, filter 0.25s ease;
   padding: 0;
 }
 .piggy-btn:active { transform: scale(0.9); }
 .piggy-icon {
   display: block;
-  width: 32px;
-  height: 28px;
+  width: 36px;
+  height: 32px;
   object-fit: contain;
   opacity: 0.45;
   transition: opacity 0.25s ease, filter 0.25s ease;
@@ -186,12 +185,16 @@ input, select { font-family: inherit; font-size: inherit; color: inherit; }
   .piggy-icon { filter: invert(1); }
 }
 .piggy-btn.has-money {
-  background: rgba(255, 200, 70, 0.18);
-  box-shadow: 0 0 0 2px rgba(255, 200, 70, 0.3);
   animation: piggyWiggle 3s ease-in-out infinite;
 }
 .piggy-btn.has-money .piggy-icon {
   opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(255, 200, 70, 0.6));
+}
+@media (prefers-color-scheme: dark) {
+  .piggy-btn.has-money .piggy-icon {
+    filter: invert(1) drop-shadow(0 0 6px rgba(255, 200, 70, 0.6));
+  }
 }
 @keyframes piggyWiggle {
   0%, 70%, 100% { transform: rotate(0deg); }
