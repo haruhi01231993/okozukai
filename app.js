@@ -17,6 +17,7 @@ const defaultState = {
   categoryRows: [],        // [{name, row}]
   monthlyBudget: 0,        // 新規月のデフォルト値（設定変更で更新）
   monthlyBudgets: {},      // {"2026-05": 108556, "2026-06": 120000} 月ごとの目標額
+  monthlyGoals: {},        // {"2026-06": "貯金優先！"} 月ごとの目標文言
   spreadsheetId: "",
   sheetName: "",
   rolloverEnabled: true,
@@ -187,6 +188,11 @@ function ensureMonthBudget(key) {
   }
 }
 
+/// 指定月の目標文言（自由記入）
+function goalForMonth(key) {
+  return (state.monthlyGoals && state.monthlyGoals[key]) || "";
+}
+
 function effectiveBudget(forKey = null) {
   const key = forKey || monthKey();
   return budgetForMonth(key) + (state.monthlyBoosts[key] || 0);
@@ -313,12 +319,12 @@ const MESSAGES = {
     (sav) => `🍀 今月の節約が来月の余裕に`,
   ],
   over: [
-    (over) => `💡 残りの週で少し抑えれば取り戻せる`,
-    (over) => `🍵 来週はスローダウンしてみよう`,
+    (over) => `💡 残りの週でちょっと抑えてみよう`,
+    (over) => `🍵 来週はゆっくり過ごすのもあり`,
     (over) => `📊 後半戦、ここから挽回！`,
-    (over) => `🌷 オーバーした分は次の節約で取り返せる`,
-    (over) => `🎯 ${formatYen(Math.abs(over))}多め。残り週で工夫してみよう`,
-    (over) => `🔄 ペース調整中。気にせず続けよう`,
+    (over) => `🌷 次月の節約で取り返せる`,
+    (over) => `🎯 少しペースが早めかも`,
+    (over) => `🔄 気にせずマイペースに`,
   ],
   ontrack: [
     `📈 計画通りのペース`,
@@ -406,38 +412,68 @@ function ratingLabel(r) {
 // =====================================================
 // カテゴリ自動分類
 // =====================================================
+// カテゴリ自動推定用のキーワード辞書。
+// 「趣味」「体験・交友」のセクション見出し自体はカテゴリではないが、
+// その下のカテゴリはすべて自動推定対象。
 const KEYWORDS = {
-  "ジム": ["ジム", "gym", "フィットネス", "ヨガ", "ピラティス"],
-  "ネイル": ["ネイル", "nail", "マニキュア", "ジェル"],
-  "まつぱ": ["まつぱ", "まつパ", "まつ毛", "マツエク", "まつげ", "アイラッシュ"],
-  "眉毛": ["眉", "アイブロウ", "まゆ"],
-  "美容院": ["美容院", "美容室", "カット", "カラー", "パーマ", "縮毛", "ヘア"],
-  "コスメ": ["コスメ", "化粧品", "ファンデ", "リップ", "口紅", "アイシャドウ", "メイク", "下地", "マスカラ", "チーク"],
-  "サブスク": ["サブスク", "Netflix", "Spotify", "Apple Music", "YouTube Premium", "Amazon Prime", "Disney"],
-  "服": ["服", "シャツ", "パンツ", "ワンピ", "コート", "スカート", "ジャケット", "Tシャツ", "ニット", "デニム", "セーター"],
-  "サンリオ": ["サンリオ", "キティ", "シナモロール", "クロミ", "マイメロ", "ポムポムプリン", "ポチャッコ"],
-  "本": ["本", "書籍", "雑誌", "漫画", "コミック", "kindle"],
-  "ガチャ": ["ガチャ", "カプセル"],
-  "推し活": ["推し", "ライブ", "コンサート", "グッズ", "チェキ", "アクスタ", "缶バッジ", "舞台"],
-  "FC": ["FC", "ファンクラブ", "会員費", "年会費"],
-  "プレゼント": ["プレゼント", "ギフト", "誕生日", "お祝い", "祝い"],
-  "旅行": ["旅行", "ホテル", "宿", "飛行機", "新幹線", "観光"],
-  "食事": ["食事", "ランチ", "ディナー", "カフェ", "コーヒー", "コンビニ", "レストラン", "外食", "スタバ", "ご飯", "焼肉", "寿司"],
-  "特急/グリーン": ["特急", "グリーン", "新幹線"],
-  "奨学金": ["奨学金"],
-  "はるひ散髪": ["はるひ"],
+  // ── 自己投資 ──
+  "ネイル": ["ネイル", "nail", "マニキュア", "ジェル", "ネイルオフ", "ネイルサロン", "オフ代", "スカルプ"],
+  "まつぱ/眉毛": [
+    // まつぱ系
+    "まつぱ", "まつパ", "まつ毛", "マツエク", "まつげ", "アイラッシュ", "パリジェンヌ", "ラッシュリフト", "ラッシュ",
+    // 眉毛系
+    "眉", "アイブロウ", "まゆ", "眉毛サロン", "ワックス脱毛"
+  ],
+  "美容院": ["美容院", "美容室", "カット", "カラー", "パーマ", "縮毛", "ヘア", "トリートメント", "サロン", "ブリーチ", "髪染め", "染髪"],
+  "コスメ": ["コスメ", "化粧品", "ファンデ", "リップ", "口紅", "アイシャドウ", "メイク", "下地", "マスカラ", "チーク", "スキンケア", "化粧水", "乳液", "美容液", "日焼け止め", "パック", "セラム", "デパコス", "アイライナー", "コンシーラー", "ハイライト", "香水", "パフューム", "洗顔", "クレンジング", "アイクリーム", "ボディクリーム", "ハンドクリーム"],
+
+  // ── 趣味 ──
+  "サブスク": ["サブスク", "Netflix", "Spotify", "Apple Music", "YouTube Premium", "Amazon Prime", "Disney", "HULU", "U-NEXT", "ABEMA", "iCloud", "Adobe", "Kindle Unlimited", "月額", "定額"],
+  "服": ["服", "洋服", "シャツ", "パンツ", "ワンピ", "ワンピース", "コート", "スカート", "ジャケット", "Tシャツ", "ニット", "デニム", "セーター", "ブラウス", "カーディガン", "パーカー", "スウェット", "ジーンズ", "ドレス", "GU", "ユニクロ", "ZARA", "H&M", "靴", "スニーカー", "ヒール", "パンプス", "サンダル", "ブーツ", "バッグ", "カバン", "リュック", "ポーチ", "帽子", "アクセ", "アクセサリー", "ピアス", "イヤリング", "ネックレス", "指輪", "ブレスレット", "下着", "ブラ", "ショーツ", "タイツ", "ストッキング", "ソックス", "靴下", "パジャマ", "ルームウェア", "水着"],
+  "サンリオ": ["サンリオ", "キティ", "シナモロール", "シナモン", "クロミ", "マイメロ", "ポムポムプリン", "ポチャッコ", "ハンギョドン", "ぐでたま", "けろっぴ", "ポチャコ"],
+  "本": ["本", "書籍", "雑誌", "漫画", "マンガ", "コミック", "kindle", "ブック", "単行本", "新書", "文庫", "小説", "参考書", "写真集", "ムック"],
+  "ガチャ": ["ガチャ", "カプセル", "ガチャポン", "カプセルトイ", "ガシャポン"],
+  "推し活": ["推し", "ライブ", "コンサート", "グッズ", "チェキ", "アクスタ", "缶バッジ", "舞台", "推し活", "応援", "ペンライト", "ペンラ", "オタ活", "遠征", "フィルム", "特典", "生写真", "アクリル", "うちわ", "CD", "DVD", "Blu-ray", "ブルーレイ", "円盤", "ミュージカル", "公演"],
+  "FC": ["FC", "ファンクラブ", "会員費", "年会費", "継続", "会員"],
+  "その他購入品": ["雑貨", "日用品", "ドラッグストア", "ドラッグ", "薬", "サプリ", "ティッシュ", "洗剤", "タオル", "文房具", "文具", "ペン", "ノート", "収納", "電池", "充電", "ケーブル", "イヤホン", "アダプター", "電球", "生理用品", "ナプキン"],
+
+  // ── 体験・交友 ──
+  "プレゼント": ["プレゼント", "ギフト", "誕生日", "お祝い", "祝い", "お礼", "手土産", "クリスマス", "母の日", "父の日", "バレンタイン"],
+  "旅行": ["旅行", "ホテル", "宿", "飛行機", "航空券", "観光", "レンタカー", "高速", "旅館", "民宿", "民泊", "airbnb", "エアビ", "温泉", "パスポート", "土産", "おみやげ"],
+  "外食": ["食事", "外食", "ディナー", "カフェ", "コーヒー", "レストラン", "スタバ", "スターバックス", "ご飯", "ごはん", "焼肉", "寿司", "デリバリー", "Uber", "出前", "スイーツ", "ケーキ", "デザート", "アイス", "カレー", "ラーメン", "パスタ", "うどん", "そば", "ドトール", "タリーズ", "プロント", "サイゼ", "マック", "マクドナルド", "モス", "ケンタ", "定食", "居酒屋", "バー", "呑み", "飲み会", "パフェ", "どんぶり", "カツ", "天ぷら", "餃子", "ピザ", "焼鳥", "焼き鳥", "ビール", "ワイン", "酒", "サンドイッチ", "サンド", "モスバーガー", "バーガー", "唐揚げ", "からあげ", "牛丼", "松屋", "すき家", "吉野家", "はなまる", "びっくりドンキー", "スシロー", "くら寿司", "はま寿司", "回転寿司", "コンビニ", "セブン", "ローソン", "ファミマ", "ミニストップ"],
+  "会社ランチ": ["会社ランチ", "社食", "オフィスランチ", "会社の昼", "会社の昼食", "職場ランチ", "オフィス", "会社の食堂"],
+
+  // ── その他 ──
+  "特急/グリーン": ["特急", "グリーン", "新幹線", "指定席"],
+  "奨学金": ["奨学金", "学生ローン"],
+  "はるひ散髪": ["はるひ", "散髪"],
+  "その他": []
 };
 
+/// カテゴリ推定: 最も長くマッチしたキーワードを優先
 function suggestCategory(text, categories) {
   if (!categories.length) return "その他";
-  const lower = text.toLowerCase();
+  const lower = text.toLowerCase().trim();
+  if (!lower) return categories[0];
+
+  let bestCategory = null;
+  let bestScore = 0;
   for (const c of categories) {
     const kws = KEYWORDS[c];
     if (!kws) continue;
     for (const kw of kws) {
-      if (lower.includes(kw.toLowerCase())) return c;
+      const kwLower = kw.toLowerCase();
+      if (lower.includes(kwLower)) {
+        // より長いキーワードのマッチを優先
+        const score = kwLower.length;
+        if (score > bestScore) {
+          bestScore = score;
+          bestCategory = c;
+        }
+      }
     }
   }
+  if (bestCategory) return bestCategory;
   // フォールバック: その他系を優先
   const other = categories.find(c => c === "その他" || c.includes("その他"));
   return other || categories[0];
@@ -725,6 +761,18 @@ function renderBalance() {
   $("balance-spent").textContent = "使った: " + formatYen(t);
   $("balance-budget").textContent = "目標: " + formatYen(curBud);
 
+  // 今月の目標文言
+  const goalEl = $("balance-goal");
+  if (goalEl) {
+    const goal = goalForMonth(monthKey());
+    if (goal) {
+      goalEl.textContent = "🎯 " + goal;
+      goalEl.classList.remove("hidden");
+    } else {
+      goalEl.classList.add("hidden");
+    }
+  }
+
   const pct = curBud > 0 ? Math.min(Math.max(t / curBud * 100, 0), 100) : 0;
   $("progress-fill").style.width = pct + "%";
   $("progress-fill").classList.toggle("over", r < 0);
@@ -735,11 +783,8 @@ function renderBalance() {
     badge.classList.remove("hidden", "negative");
     badge.classList.add("positive");
     badge.innerHTML = `🌱 +${formatYen(sav)} 節約中`;
-  } else if (sav < 0) {
-    badge.classList.remove("hidden", "positive");
-    badge.classList.add("negative");
-    badge.innerHTML = `⚠️ ${formatYen(sav)} ペースオーバー`;
   } else {
+    // マイナス（ペースオーバー）は表示しない
     badge.classList.add("hidden");
   }
 
@@ -761,38 +806,84 @@ function renderBalance() {
   }
 }
 
-function renderWeekly() {
-  const weeks = weekBreakdowns();
-  const card = $("weekly-card");
-  if (weeks.length === 0) {
+// SVG円グラフ用のパレット
+const CHART_COLORS = [
+  "#FF6B9D", "#7DCEA0", "#5DADE2", "#F5B041", "#BB8FCE",
+  "#48C9B0", "#EC7063", "#F1948A", "#85C1E2", "#F8C471",
+  "#AF7AC5", "#58D68D", "#F4D03F", "#EB984E", "#5499C7",
+  "#48D1CC", "#FFA07A", "#98D8C8", "#DDA0DD", "#87CEEB"
+];
+
+function polarToCartesian(cx, cy, radius, angleInDegrees) {
+  const rad = (angleInDegrees - 90) * Math.PI / 180;
+  return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
+}
+
+function describeArc(cx, cy, radius, startAngle, endAngle) {
+  const start = polarToCartesian(cx, cy, radius, endAngle);
+  const end = polarToCartesian(cx, cy, radius, startAngle);
+  const largeArc = endAngle - startAngle <= 180 ? "0" : "1";
+  return [
+    "M", cx, cy,
+    "L", start.x, start.y,
+    "A", radius, radius, 0, largeArc, 0, end.x, end.y,
+    "Z"
+  ].join(" ");
+}
+
+function renderCategoryChart() {
+  const card = $("chart-card");
+  if (!card) return;
+  const monthExp = currentMonthExpenses();
+  if (monthExp.length === 0) {
+    card.classList.add("hidden");
+    return;
+  }
+  const byCat = {};
+  monthExp.forEach(e => {
+    byCat[e.category] = (byCat[e.category] || 0) + e.amount;
+  });
+  const sorted = Object.entries(byCat)
+    .map(([name, amount]) => ({ name, amount }))
+    .sort((a, b) => b.amount - a.amount);
+  const total = sorted.reduce((a, x) => a + x.amount, 0);
+  if (total === 0) {
     card.classList.add("hidden");
     return;
   }
   card.classList.remove("hidden");
-  const rows = weeks.map(w => {
-    const tagHtml = [];
-    if (w.state === "current") tagHtml.push(`<span class="tag current">今週</span>`);
-    if (w.rating) tagHtml.push(`<span class="tag rating-${w.rating}">${ratingLabel(w.rating)}</span>`);
-    let remColor = "";
-    if (w.remaining < 0) remColor = "red";
-    else if (w.state === "completed" && w.remaining > 0) remColor = "green";
-    return `
-      <div class="week-row">
-        <div class="week-row-left">
-          <div class="week-row-label ${w.state === "current" ? "current" : ""}">
-            ${w.weekIndex}週目
-            ${tagHtml.join("")}
-          </div>
-          <div class="week-row-dates">${w.month}/${w.startDay} – ${w.month}/${w.endDay}</div>
-        </div>
-        <div class="week-row-right">
-          <div class="week-row-remaining ${remColor}">${formatYen(w.remaining)}</div>
-          <div class="week-row-budget">/ ${formatYen(w.budget)}</div>
-        </div>
+
+  const cx = 100, cy = 100, radius = 90;
+  const slicesHtml = [];
+  const legendHtml = [];
+  let angle = 0;
+
+  sorted.forEach((cat, i) => {
+    const color = CHART_COLORS[i % CHART_COLORS.length];
+    const percentage = cat.amount / total;
+    const arcAngle = percentage * 360;
+
+    if (sorted.length === 1) {
+      // 1カテゴリのみの場合はcircle
+      slicesHtml.push(`<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${color}"/>`);
+    } else {
+      slicesHtml.push(`<path d="${describeArc(cx, cy, radius, angle, angle + arcAngle)}" fill="${color}"/>`);
+    }
+
+    const pct = Math.round(percentage * 100);
+    legendHtml.push(`
+      <div class="legend-item">
+        <span class="legend-color" style="background:${color}"></span>
+        <span class="legend-name">${escapeHtml(cat.name)}</span>
+        <span class="legend-amount">${formatYen(cat.amount)}<span class="legend-pct">(${pct}%)</span></span>
       </div>
-    `;
-  }).join("");
-  $("weekly-rows").innerHTML = rows;
+    `);
+    angle += arcAngle;
+  });
+
+  $("chart-svg").innerHTML = `<svg viewBox="0 0 200 200" style="width:100%;height:auto;display:block;">${slicesHtml.join("")}</svg>`;
+  $("chart-legend").innerHTML = legendHtml.join("");
+  $("chart-total").textContent = `合計 ${formatYen(total)}`;
 }
 
 function renderExpenseList() {
@@ -843,7 +934,7 @@ function renderAll() {
   }
   showScreen("screen-main");
   renderBalance();
-  renderWeekly();
+  renderCategoryChart();
   renderExpenseList();
 }
 
@@ -967,6 +1058,8 @@ function openSettings() {
   // 表示は「今月の目標額」（monthlyBudgets[今月] があればそれ、なければデフォルト）
   const curBud = budgetForMonth(monthKey());
   $("settings-budget").value = curBud > 0 ? String(curBud) : "";
+  const goalEl = $("settings-goal");
+  if (goalEl) goalEl.value = goalForMonth(monthKey());
   $("settings-rollover").checked = state.rolloverEnabled;
   $("settings-ss-id").value = state.spreadsheetId || "";
   $("settings-sheet-name").value = state.sheetName || "";
@@ -1035,6 +1128,17 @@ function saveSettings() {
     state.monthlyBudgets[monthKey()] = v;
     // 新規月のデフォルト値も更新（翌月以降がこの値を継承）
     state.monthlyBudget = v;
+  }
+  // 今月の目標文言（自由記入）
+  const goalEl = $("settings-goal");
+  if (goalEl) {
+    if (!state.monthlyGoals) state.monthlyGoals = {};
+    const goalText = goalEl.value.trim();
+    if (goalText) {
+      state.monthlyGoals[monthKey()] = goalText;
+    } else {
+      delete state.monthlyGoals[monthKey()];
+    }
   }
   state.rolloverEnabled = $("settings-rollover").checked;
   state.spreadsheetId = $("settings-ss-id").value.trim();

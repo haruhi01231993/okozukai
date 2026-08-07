@@ -48,6 +48,7 @@
         </button>
         <div class="muted small">今月の残り</div>
         <div class="balance-amount" id="balance-amount">¥0</div>
+        <div class="balance-goal hidden" id="balance-goal"></div>
         <div id="savings-badge" class="hidden"></div>
         <div class="progress-bar">
           <div class="progress-fill" id="progress-fill"></div>
@@ -59,10 +60,16 @@
         <div id="motivation-message" class="motivation-message hidden"></div>
       </div>
 
-      <!-- 週ごとカード -->
-      <div class="card weekly-card hidden" id="weekly-card">
-        <div class="muted small">週ごとのおこづかい</div>
-        <div id="weekly-rows"></div>
+      <!-- カテゴリ別 円グラフ -->
+      <div class="card chart-card hidden" id="chart-card">
+        <div class="chart-header">
+          <span class="muted small">今月の内訳</span>
+          <span class="muted small" id="chart-total"></span>
+        </div>
+        <div class="chart-container">
+          <div id="chart-svg"></div>
+          <div id="chart-legend"></div>
+        </div>
       </div>
 
       <!-- 支出リスト -->
@@ -139,6 +146,12 @@
             <input id="settings-budget" type="number" inputmode="numeric" class="form-input">
           </div>
           <p class="form-help">変更は今月に反映されます。過去月の目標額は元のまま固定されます。</p>
+        </div>
+
+        <div class="form-section">
+          <label class="form-label">今月の目標（自由記入）</label>
+          <input id="settings-goal" type="text" class="form-input" placeholder="例: 貯金優先！">
+          <p class="form-help">今月に向けての気持ちや目標を残せます。メイン画面に表示されます。</p>
         </div>
 
         <div class="form-section">

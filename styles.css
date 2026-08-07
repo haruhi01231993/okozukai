@@ -242,6 +242,76 @@ input, select { font-family: inherit; font-size: inherit; color: inherit; }
   color: var(--text-secondary);
 }
 
+.balance-goal {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  background: rgba(109, 196, 180, 0.12);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.chart-card {
+  padding: 16px;
+}
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.chart-container {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+#chart-svg {
+  flex: 0 0 40%;
+  max-width: 160px;
+  min-width: 120px;
+}
+#chart-legend {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.legend-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.legend-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.legend-amount {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.legend-pct {
+  margin-left: 4px;
+  color: var(--text-tertiary);
+}
+
 .motivation-message {
   margin-top: 12px;
   padding: 10px 12px;
