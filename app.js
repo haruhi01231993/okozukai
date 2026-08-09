@@ -440,8 +440,8 @@ const KEYWORDS = {
   // ── 体験・交友 ──
   "プレゼント": ["プレゼント", "ギフト", "誕生日", "お祝い", "祝い", "お礼", "手土産", "クリスマス", "母の日", "父の日", "バレンタイン"],
   "旅行": ["旅行", "ホテル", "宿", "飛行機", "航空券", "観光", "レンタカー", "高速", "旅館", "民宿", "民泊", "airbnb", "エアビ", "温泉", "パスポート", "土産", "おみやげ"],
-  "外食": ["食事", "外食", "ディナー", "カフェ", "コーヒー", "レストラン", "スタバ", "スターバックス", "ご飯", "ごはん", "焼肉", "寿司", "デリバリー", "Uber", "出前", "スイーツ", "ケーキ", "デザート", "アイス", "カレー", "ラーメン", "パスタ", "うどん", "そば", "ドトール", "タリーズ", "プロント", "サイゼ", "マック", "マクドナルド", "モス", "ケンタ", "定食", "居酒屋", "バー", "呑み", "飲み会", "パフェ", "どんぶり", "カツ", "天ぷら", "餃子", "ピザ", "焼鳥", "焼き鳥", "ビール", "ワイン", "酒", "サンドイッチ", "サンド", "モスバーガー", "バーガー", "唐揚げ", "からあげ", "牛丼", "松屋", "すき家", "吉野家", "はなまる", "びっくりドンキー", "スシロー", "くら寿司", "はま寿司", "回転寿司", "コンビニ", "セブン", "ローソン", "ファミマ", "ミニストップ"],
-  "会社ランチ": ["会社ランチ", "社食", "オフィスランチ", "会社の昼", "会社の昼食", "職場ランチ", "オフィス", "会社の食堂"],
+  "外食": ["食事", "外食", "ディナー", "カフェ", "コーヒー", "レストラン", "ご飯", "ごはん", "焼肉", "寿司", "デリバリー", "Uber", "出前", "スイーツ", "ケーキ", "デザート", "アイス", "カレー", "ラーメン", "パスタ", "うどん", "そば", "ドトール", "タリーズ", "プロント", "サイゼ", "マック", "マクドナルド", "モス", "ケンタ", "定食", "居酒屋", "バー", "呑み", "飲み会", "パフェ", "どんぶり", "カツ", "天ぷら", "餃子", "ピザ", "焼鳥", "焼き鳥", "ビール", "ワイン", "酒", "サンドイッチ", "サンド", "モスバーガー", "バーガー", "唐揚げ", "からあげ", "牛丼", "松屋", "すき家", "吉野家", "はなまる", "びっくりドンキー", "スシロー", "くら寿司", "はま寿司", "回転寿司", "コンビニ", "セブン", "ローソン", "ファミマ", "ミニストップ"],
+  "会社ランチ": ["会社ランチ", "社食", "オフィスランチ", "会社の昼", "会社の昼食", "職場ランチ", "オフィス", "会社の食堂", "ランチ", "スタバ", "スターバックス"],
 
   // ── その他 ──
   "特急/グリーン": ["特急", "グリーン", "新幹線", "指定席"],
@@ -814,6 +814,34 @@ const CHART_COLORS = [
   "#48D1CC", "#FFA07A", "#98D8C8", "#DDA0DD", "#87CEEB"
 ];
 
+// カテゴリ→絵文字アイコン
+const CATEGORY_ICONS = {
+  "ネイル": "💅",
+  "まつぱ/眉毛": "👁️",
+  "美容院": "💇‍♀️",
+  "コスメ": "💄",
+  "サブスク": "📺",
+  "服": "👗",
+  "サンリオ": "🎀",
+  "本": "📖",
+  "ガチャ": "🎰",
+  "推し活": "💖",
+  "FC": "🎫",
+  "その他購入品": "🛍️",
+  "プレゼント": "🎁",
+  "旅行": "✈️",
+  "外食": "🍽️",
+  "会社ランチ": "🍱",
+  "特急/グリーン": "🚄",
+  "奨学金": "🎓",
+  "はるひ散髪": "✂️",
+  "その他": "📦"
+};
+
+function iconFor(category) {
+  return CATEGORY_ICONS[category] || "🏷️";
+}
+
 function polarToCartesian(cx, cy, radius, angleInDegrees) {
   const rad = (angleInDegrees - 90) * Math.PI / 180;
   return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
@@ -855,6 +883,7 @@ function renderCategoryChart() {
 
   const cx = 100, cy = 100, radius = 90;
   const slicesHtml = [];
+  const iconsHtml = [];
   const legendHtml = [];
   let angle = 0;
 
@@ -870,10 +899,19 @@ function renderCategoryChart() {
       slicesHtml.push(`<path d="${describeArc(cx, cy, radius, angle, angle + arcAngle)}" fill="${color}"/>`);
     }
 
+    // 大きめの slice にはアイコンを乗せる
+    if (percentage >= 0.06) {
+      const midAngle = angle + arcAngle / 2;
+      const iconRadius = radius * 0.6;
+      const iconPos = polarToCartesian(cx, cy, iconRadius, midAngle);
+      iconsHtml.push(`<text x="${iconPos.x}" y="${iconPos.y}" font-size="16" text-anchor="middle" dominant-baseline="central">${iconFor(cat.name)}</text>`);
+    }
+
     const pct = Math.round(percentage * 100);
     legendHtml.push(`
       <div class="legend-item">
         <span class="legend-color" style="background:${color}"></span>
+        <span class="legend-icon">${iconFor(cat.name)}</span>
         <span class="legend-name">${escapeHtml(cat.name)}</span>
         <span class="legend-amount">${formatYen(cat.amount)}<span class="legend-pct">(${pct}%)</span></span>
       </div>
@@ -881,7 +919,7 @@ function renderCategoryChart() {
     angle += arcAngle;
   });
 
-  $("chart-svg").innerHTML = `<svg viewBox="0 0 200 200" style="width:100%;height:auto;display:block;">${slicesHtml.join("")}</svg>`;
+  $("chart-svg").innerHTML = `<svg viewBox="0 0 200 200" style="width:100%;height:auto;display:block;">${slicesHtml.join("")}${iconsHtml.join("")}</svg>`;
   $("chart-legend").innerHTML = legendHtml.join("");
   $("chart-total").textContent = `合計 ${formatYen(total)}`;
 }

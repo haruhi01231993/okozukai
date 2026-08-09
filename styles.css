@@ -294,6 +294,11 @@ input, select { font-family: inherit; font-size: inherit; color: inherit; }
   border-radius: 2px;
   flex-shrink: 0;
 }
+.legend-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  line-height: 1;
+}
 .legend-name {
   flex: 1 1 auto;
   min-width: 0;
