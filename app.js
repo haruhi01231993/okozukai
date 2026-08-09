@@ -817,7 +817,7 @@ const CHART_COLORS = [
 // カテゴリ→絵文字アイコン
 const CATEGORY_ICONS = {
   "ネイル": "💅",
-  "まつぱ/眉毛": "👁️",
+  "まつぱ/眉毛": "👀",
   "美容院": "💇‍♀️",
   "コスメ": "💄",
   "サブスク": "📺",
@@ -830,7 +830,7 @@ const CATEGORY_ICONS = {
   "その他購入品": "🛍️",
   "プレゼント": "🎁",
   "旅行": "✈️",
-  "外食": "🍽️",
+  "外食": "🍴",
   "会社ランチ": "🍱",
   "特急/グリーン": "🚄",
   "奨学金": "🎓",
@@ -840,6 +840,21 @@ const CATEGORY_ICONS = {
 
 function iconFor(category) {
   return CATEGORY_ICONS[category] || "🏷️";
+}
+
+/// 今月のカテゴリごとの円グラフ色マップを取得（多い順にCHART_COLORSを割当）
+function categoryColorMap() {
+  const monthExp = currentMonthExpenses();
+  const byCat = {};
+  monthExp.forEach(e => {
+    byCat[e.category] = (byCat[e.category] || 0) + e.amount;
+  });
+  const sorted = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const map = {};
+  sorted.forEach(([name, _], i) => {
+    map[name] = CHART_COLORS[i % CHART_COLORS.length];
+  });
+  return map;
 }
 
 function polarToCartesian(cx, cy, radius, angleInDegrees) {
@@ -935,8 +950,13 @@ function renderExpenseList() {
     empty.classList.add("hidden");
     // 当月のみ＋日付の新しい順
     const sorted = expensesForMonthSorted(monthKey());
-    list.innerHTML = sorted.map(e => `
+    const colorMap = categoryColorMap();
+    list.innerHTML = sorted.map(e => {
+      const color = colorMap[e.category] || "#999999";
+      const icon = iconFor(e.category);
+      return `
       <div class="expense-row" data-id="${e.id}">
+        <div class="expense-avatar" style="background:${color}33;">${icon}</div>
         <div class="expense-info">
           <div class="expense-name">${escapeHtml(e.name)}</div>
           <div class="expense-meta">
@@ -946,7 +966,8 @@ function renderExpenseList() {
         </div>
         <div class="expense-amount">${formatYen(e.amount)}</div>
       </div>
-    `).join("");
+    `;
+    }).join("");
     list.querySelectorAll(".expense-row").forEach(el => {
       el.addEventListener("click", () => {
         const id = el.dataset.id;
