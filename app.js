@@ -811,49 +811,57 @@ const CHART_COLORS = [
   "#48D1CC", "#FFA07A", "#98D8C8", "#DDA0DD", "#87CEEB"
 ];
 
-// カテゴリ→色 ジャンル別に系統色を割り当て
-// 自己投資=グリーン系 / 趣味=ピンク系 / 体験・交友=ブルー系 / 食事=オレンジ系 / その他=グレー
+// カテゴリ→色 ジャンル別に統一色（ジャンル内は全カテゴリ同じ色）
+// 自己投資=グリーン / 趣味=ピンク / 体験・交友=ブルー / 食事=オレンジ / その他=グレー
+const SECTION_COLORS = {
+  jibun: "#4CAF50",   // グリーン
+  hobby: "#EC407A",   // ピンク
+  social: "#2196F3",  // ブルー
+  food: "#FF9800",    // オレンジ
+  other: "#9E9E9E"    // グレー
+};
+
 const CATEGORY_COLORS = {
-  // ── 自己投資（Green系）──
-  "ネイル":       "#48C9B0",  // ミントグリーン
-  "まつぱ/眉毛":  "#58D68D",  // ミディアムグリーン
-  "美容院":       "#4CAF50",  // フォレストグリーン
-  "コスメ":       "#82E0AA",  // ライトグリーン
-  "歯医者":       "#26A69A",  // ティール
+  // ── 自己投資（すべてグリーン）──
+  "ネイル":       SECTION_COLORS.jibun,
+  "まつぱ/眉毛":  SECTION_COLORS.jibun,
+  "美容院":       SECTION_COLORS.jibun,
+  "コスメ":       SECTION_COLORS.jibun,
+  "歯医者":       SECTION_COLORS.jibun,
 
-  // ── 趣味（Pink系）──
-  "ファッション": "#FF6B9D",  // ホットピンク
-  "本":           "#F48FB1",  // ソフトピンク
-  "趣味グッズ":   "#EC407A",  // マゼンタピンク
-  "ガチャ":       "#F06292",  // ローズ
-  "100均":        "#FFB6C1",  // ライトピンク
-  "サンリオ":     "#E91E63",  // ピンク
-  "WICKED":       "#AD1457",  // ディープピンク
+  // ── 趣味（すべてピンク）──
+  "ファッション": SECTION_COLORS.hobby,
+  "本":           SECTION_COLORS.hobby,
+  "趣味グッズ":   SECTION_COLORS.hobby,
+  "ガチャ":       SECTION_COLORS.hobby,
+  "100均":        SECTION_COLORS.hobby,
+  "サンリオ":     SECTION_COLORS.hobby,
+  "WICKED":       SECTION_COLORS.hobby,
 
-  // ── 体験・交友（Blue系）──
-  "展示/イベント": "#5DADE2", // スカイブルー
-  "プレゼント":    "#3498DB", // ブルー
-  "旅行":          "#29B6F6", // ライトブルー
+  // ── 体験・交友（すべてブルー）──
+  "展示/イベント": SECTION_COLORS.social,
+  "プレゼント":    SECTION_COLORS.social,
+  "旅行":          SECTION_COLORS.social,
 
-  // ── 食事（Orange系）──
-  "出社日食事":    "#FF9800", // オレンジ
-  "外食":          "#F57C00", // ディープオレンジ
-  "カフェ":        "#FFB74D", // ライトオレンジ
+  // ── 食事（すべてオレンジ）──
+  "出社日食事":    SECTION_COLORS.food,
+  "外食":          SECTION_COLORS.food,
+  "カフェ":        SECTION_COLORS.food,
 
-  // ── その他（Gray）──
-  "その他":        "#9E9E9E",
+  // ── その他（グレー）──
+  "その他":        SECTION_COLORS.other,
 
   // ── 旧カテゴリ（過去データ互換）──
-  "サブスク":      "#F06292",  // ピンク
-  "服":            "#FF6B9D",  // ピンク（ファッション相当）
-  "推し活":        "#EC407A",  // ピンク（趣味グッズ相当）
-  "FC":            "#FFB6C1",  // ピンク
-  "その他購入品":  "#B0BEC5",  // グレー寄り
-  "会社ランチ":    "#FF9800",  // オレンジ（出社日食事相当）
-  "食事":          "#F57C00",  // オレンジ（外食相当）
-  "特急/グリーン": "#5DADE2",  // ブルー
-  "奨学金":        "#9E9E9E",  // グレー
-  "はるひ散髪":    "#4CAF50"   // グリーン
+  "サブスク":      SECTION_COLORS.hobby,
+  "服":            SECTION_COLORS.hobby,
+  "推し活":        SECTION_COLORS.hobby,
+  "FC":            SECTION_COLORS.hobby,
+  "その他購入品":  SECTION_COLORS.other,
+  "会社ランチ":    SECTION_COLORS.food,
+  "食事":          SECTION_COLORS.food,
+  "特急/グリーン": SECTION_COLORS.social,
+  "奨学金":        SECTION_COLORS.other,
+  "はるひ散髪":    SECTION_COLORS.jibun
 };
 
 function colorFor(category, fallbackIndex = 0) {
