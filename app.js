@@ -4,6 +4,7 @@
 // =====================================================
 const GOOGLE_CLIENT_ID = "872334684520-3vqjsij9age39qv8k8jdsklp9pimikf0.apps.googleusercontent.com";
 const GOOGLE_SCOPES = "https://www.googleapis.com/auth/spreadsheets";
+const APP_VERSION = "v30";  // 表示用バージョン
 
 // =====================================================
 // Store / 永続化
@@ -1187,10 +1188,34 @@ function openSettings() {
   $("settings-rollover").checked = state.rolloverEnabled;
   $("settings-ss-id").value = state.spreadsheetId || "";
   $("settings-sheet-name").value = state.sheetName || "";
+  const verEl = $("settings-version");
+  if (verEl) verEl.textContent = `Version: ${APP_VERSION}`;
   renderAuthStatus();
   renderCategoriesList();
   renderHistoryList();
   showModal("modal-settings");
+}
+
+async function forceReload() {
+  try {
+    // すべてのキャッシュを削除
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    // Service Workerに即時更新を通知
+    if (navigator.serviceWorker) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) {
+        await r.update();
+        if (r.waiting) r.waiting.postMessage("SKIP_WAITING");
+      }
+    }
+    // キャッシュバスト付きでリロード
+    window.location.href = window.location.pathname + "?t=" + Date.now();
+  } catch (e) {
+    window.location.reload(true);
+  }
 }
 
 function renderCategoriesList() {
@@ -1540,6 +1565,14 @@ function bindEvents() {
     const file = e.target.files[0];
     if (file) importData(file);
     e.target.value = "";
+  });
+
+  // Force reload (キャッシュクリア再読込)
+  const btnForce = $("btn-force-reload");
+  if (btnForce) btnForce.addEventListener("click", () => {
+    if (confirm("アプリを最新版に強制更新します。よろしいですか？")) {
+      forceReload();
+    }
   });
 }
 
